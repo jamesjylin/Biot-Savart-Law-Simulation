@@ -1,0 +1,111 @@
+%%
+clear
+mu0 = 4*pi*1e-7; %magnetic constant
+theta = linspace(-22*2*pi,22*2*pi,22*1000); %
+coildim = [0.02875.*cos(theta);0.02875.*sin(theta);2.134e-4.*theta];
+coildimderiv = [-0.02875.*sin(theta);0.02875.*cos(theta)...
+    ;2.134e-4*ones(1,length(theta))]; %Parametric functions for...
+%the coil and its derivative at every point. Defined by theta.
+ 
+i1 = 1.171;
+i2 = 1.134; %current in Amperes
+ 
+counter = 1;
+counter2 = 1; %counters to fill up matrices in a for loop
+ 
+rotation1y = [ -0.0000000,  0.0000000, -1.0000000;
+   0.0000000,  1.0000000,  0.0000000;
+   1.0000000,  0.0000000, -0.0000000 ];
+rotation1z = [ -0.5000000, -0.8660254,  0.0000000;
+   0.8660254, -0.5000000,  0.0000000;
+   0.0000000,  0.0000000,  1.0000000 ];
+rotation2y = [  0.5000000,  0.0000000, -0.8660254;
+   0.0000000,  1.0000000,  0.0000000;
+   0.8660254,  0.0000000,  0.5000000 ];  %Rotation matrices for coils...
+%1 and 2 to rotate them in 3d space - This is achieved by...
+%left-multiplying the function with the rotation matrix.
+location2 = [-0.17;0.056;0.012];%Movement of coil 2 in 3d
+ 
+coil1 = rotation1y*coildim;
+coil1 = rotation1z*coil1;
+coilderiv1 = rotation1y*coildimderiv;
+coilderiv1 = rotation1z*coilderiv1; %left-multiplying coil 1 
+ 
+coil2 = rotation2y*coildim;
+coil2 = coil2 + location2; 
+coilderiv2 = rotation2y*coildimderiv; %left-multiplying coil 2
+%%
+X = linspace(-0.24,0.04,15); % x [m]
+Y = linspace(-0.04,0.12,15); % y [m]
+Z = linspace(-0.1,0.1,20); % z [m]
+Pos = [zeros(1,1);zeros(1,1);zeros(1,1)]; %x by 3 matrix for 3d positions
+B = [zeros(1,1);zeros(1,1);zeros(1,1)]; %x by 3 matrix for 3d B fields
+ 
+sampleX = [-14.1 -9 -6 -6 -9 -9 -6 -6 -9 -1.7]/100;
+sampleY = [5.6 5.2 5.2 2.2 2.2 5.2 5.2 2.2 2.2 2.5]/100;
+sampleZ = [0 -0.1 -0.1 -0.1 -0.1 3 3 3 3 0]/100; %This is simply for...
+%calculation of B field at the experimental points, not displayed.
+sampleB = [zeros(1,1);zeros(1,1);zeros(1,1)];
+%%
+for i = 1:length(X);
+    for j = 1:length(Y);
+        for k = 1:length(Z);
+            Pos(:,counter) = [X(i);Y(j);Z(k)];%record position at a point
+            r1 = [-coil1(1,:)+X(i);-coil1(2,:)+Y(j);-coil1(3,:)+Z(k)];
+            r2 = [-coil2(1,:)+X(i);-coil2(2,:)+Y(j);-coil2(3,:)+Z(k)];
+            %Components of distance between position and coil
+            r1sq = r1.^2;
+            r1squares = sqrt(r1sq(1,:) + r1sq(2,:) + r1sq(3,:));
+            r2sq = r2.^2;
+            r2squares = sqrt(r2sq(1,:) + r2sq(2,:) + r2sq(3,:));
+            %Magnitude of distance between position and coil
+            dr1 = r1./r1squares;
+            dr2 = r2./r2squares;%Unit vectors (Magnitude of 1)
+            B1 = mu0/4/pi*(-cross(i1*coilderiv1,dr1)./(r1squares.^2));
+            B2 = mu0/4/pi*(-cross(i2*coilderiv2,dr2)./(r2squares.^2));
+            %Biot-Savart integration
+            Btotal = sum(B1,2)+sum(B2,2);%Summation of points,
+            %An approximation that comes close to integration
+            B(:,counter) = Btotal;
+            counter = counter + 1;
+        end
+    end
+end
+ 
+for l = 1:length(sampleX)%repetition of above process
+            r1 = [-coil1(1,:)+sampleX(l);-coil1(2,:)+sampleY(l)...
+                ;-coil1(3,:)+sampleZ(l)];
+            r2 = [-coil2(1,:)+sampleX(l);-coil2(2,:)+sampleY(l)...
+                ;-coil2(3,:)+sampleZ(l)];
+            r1sq = r1.^2;
+            r1squares = sqrt(r1sq(1,:) + r1sq(2,:) + r1sq(3,:));
+            r2sq = r2.^2;
+            r2squares = sqrt(r2sq(1,:) + r2sq(2,:) + r2sq(3,:));
+            dr1 = r1./r1squares;
+            dr2 = r2./r2squares;
+            B1 = mu0/4/pi*(-cross(i1*coilderiv1,dr1)./(r1squares.^2));
+            B2 = mu0/4/pi*(-cross(i2*coilderiv2,dr2)./(r2squares.^2));
+            Btotal = sum(B1,2)+sum(B2,2);
+            sampleB(:,counter2) = Btotal;
+            counter2 = counter2 + 1;
+end
+%%
+plot3(coil1(1,:),coil1(2,:),coil1(3,:));%Plot solenoids in 3d space
+hold on
+rotate3d on
+grid on
+plot3(coil2(1,:),coil2(2,:),coil2(3,:));
+%%
+xl = xlabel('X Position (m) ->');
+yl = ylabel('Y Position (m) ->');
+zl = zlabel('Z Position (m) ->');
+leg = legend('Coil 1','Coil 2');
+ax = gca;
+ax.FontSize = 9;
+ax.FontName = 'Times New Roman';
+ax.XMinorTick = 'on';
+ax.YMinorTick = 'on';
+ax.ZMinorTick = 'on';
+ax.TickDir = 'out'; %Graph specifications
+quiver3(Pos(1,:),Pos(2,:),Pos(3,:),B(1,:),B(2,:),B(3,:),'k',...
+    'autoscale','off','alignvertexcenters','on');%Vector plot
